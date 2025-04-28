@@ -1,5 +1,6 @@
 ﻿using M183.Controllers.Dto;
 using M183.Data;
+using M183.Logging;
 using M183.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,11 +35,26 @@ namespace M183.Controllers
         [ProducesResponseType(200)]
         public ActionResult<List<News>> GetAll()
         {
-            return Ok(_context.News
+            var logEntry = new LoggingModel
+            {
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Retrieve All News",
+                Detail = "User attempted to retrieve all news entries."
+            };
+            LoggingSystem.Log(logEntry);
+
+            var newsList = _context.News
                 .Include(n => n.Author)
                 .OrderByDescending(n => n.PostedDate)
                 .ToList()
-                .Select(SetTimezone));
+                .Select(SetTimezone);
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"Retrieved {newsList.Count()} news entries.";
+            LoggingSystem.Log(logEntry);
+
+            return Ok(newsList);
         }
 
         /// <summary>
@@ -52,14 +68,31 @@ namespace M183.Controllers
         [ProducesResponseType(404)]
         public ActionResult<News> GetById(int id)
         {
-            News? news = _context.News
+            var logEntry = new LoggingModel
+            {
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Retrieve News By ID",
+                Detail = $"User attempted to retrieve news with ID: {id}."
+            };
+            LoggingSystem.Log(logEntry);
+
+            var news = _context.News
                 .Include(n => n.Author)
                 .FirstOrDefault(n => n.Id == id);
 
             if (news == null)
             {
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = $"News with ID: {id} not found.";
+                LoggingSystem.Log(logEntry);
                 return NotFound();
             }
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"News with ID: {id} retrieved successfully.";
+            LoggingSystem.Log(logEntry);
+
             return Ok(SetTimezone(news));
         }
 
@@ -73,8 +106,21 @@ namespace M183.Controllers
         [ProducesResponseType(400)]
         public ActionResult Create(NewsDto request)
         {
+            var logEntry = new LoggingModel
+            {
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Create News",
+                Input = $"Header: {request.Header}, Detail: {request.Detail}, AuthorId: {request.AuthorId}, IsAdminNews: {request.IsAdminNews}",
+                Detail = "User attempted to create a news entry."
+            };
+            LoggingSystem.Log(logEntry);
+
             if (request == null)
             {
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = "Request was null.";
+                LoggingSystem.Log(logEntry);
                 return BadRequest();
             }
 
@@ -88,6 +134,10 @@ namespace M183.Controllers
 
             _context.News.Add(newNews);
             _context.SaveChanges();
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"News entry created successfully with ID: {newNews.Id}.";
+            LoggingSystem.Log(logEntry);
 
             return CreatedAtAction(nameof(GetById), new { id = newNews.Id}, newNews);
         }
@@ -104,17 +154,33 @@ namespace M183.Controllers
         [ProducesResponseType(404)]
         public ActionResult Update(int id, NewsDto request)
         {
+            var logEntry = new LoggingModel
+            {
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Update News",
+                Input = $"Header: {request.Header}, Detail: {request.Detail}, AuthorId: {request.AuthorId}, IsAdminNews: {request.IsAdminNews}",
+                Detail = $"User attempted to update news with ID: {id}."
+            };
+            LoggingSystem.Log(logEntry);
+
             if (request == null)
             {
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = "Request was null.";
+                LoggingSystem.Log(logEntry);
                 return BadRequest();
             }
 
             var news = _context.News.Find(id);
             if (news == null)
             {
-                return NotFound(string.Format("News {0} not found", id));
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = $"News with ID: {id} not found.";
+                LoggingSystem.Log(logEntry);
+                return NotFound($"News {id} not found");
             }
-            
+
             news.Header = request.Header;
             news.Detail = request.Detail;
             news.AuthorId = request.AuthorId;
@@ -122,6 +188,10 @@ namespace M183.Controllers
 
             _context.News.Update(news);
             _context.SaveChanges();
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"News with ID: {id} updated successfully.";
+            LoggingSystem.Log(logEntry);
 
             return Ok();
         }
@@ -138,15 +208,31 @@ namespace M183.Controllers
         [ProducesResponseType(404)]
         public ActionResult Delete(int id)
         {
+            var logEntry = new LoggingModel
+            {
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Delete News",
+                Detail = $"User attempted to delete news with ID: {id}."
+            };
+            LoggingSystem.Log(logEntry);
+
             var news = _context.News.Find(id);
             if (news == null)
             {
-                return NotFound(string.Format("News {0} not found", id));
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = $"News with ID: {id} not found.";
+                LoggingSystem.Log(logEntry);
+                return NotFound($"News {id} not found");
             }
 
             _context.News.Remove(news);
             _context.SaveChanges();
-            
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"News with ID: {id} deleted successfully.";
+            LoggingSystem.Log(logEntry);
+
             return Ok();
         }
     }

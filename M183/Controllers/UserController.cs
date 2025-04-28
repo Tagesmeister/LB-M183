@@ -1,6 +1,7 @@
 ﻿using M183.Controllers.Dto;
 using M183.Controllers.Helper;
 using M183.Data;
+using M183.Logging;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,21 +32,40 @@ namespace M183.Controllers
         [ProducesResponseType(404)]
         public ActionResult PasswordUpdate(PasswordUpdateDto request)
         {
+            var logEntry = new LoggingModel
+            {
+                UserId = request.UserId,
+                Username = User.Identity?.Name ?? "Unknown",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Action = "Password Update Attempt",
+                Input = $"NewPassword: [REDACTED], OldPassword: [REDACTED]",
+                Detail = $"User attempted to update password for UserId: {request.UserId}."
+            };
+            LoggingSystem.Log(logEntry);
+
             if (request == null)
             {
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = "Request was null.";
+                LoggingSystem.Log(logEntry);
                 return BadRequest();
             }
 
             var user = _context.Users.Find(request.UserId);
             if (user == null)
             {
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = $"User with UserId: {request.UserId} not found.";
+                LoggingSystem.Log(logEntry);
                 return NotFound(string.Format("User {0} not found", request.UserId));
             }
 
             var passwordRuleResult = IsPasswordConfirm(request.NewPassword);
             if (passwordRuleResult.Any(x => x.Item1 == true))
             {
-
+                logEntry.Status = "Failed";
+                logEntry.ErrorMessage = "Old password not confirmed.";
+                LoggingSystem.Log(logEntry);
                 return BadRequest(passwordRuleResult.Where(x => x.Item1 == true).Select(x => x.Item2).ToList());
             }
 
@@ -60,6 +80,10 @@ namespace M183.Controllers
             }
             _context.Users.Update(user);
             _context.SaveChanges();
+
+            logEntry.Status = "Success";
+            logEntry.Detail = $"Password updated successfully for UserId: {request.UserId}.";
+            LoggingSystem.Log(logEntry);
 
             HttpContext.SignOutAsync();
             return Ok("Password changed");
