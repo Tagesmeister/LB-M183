@@ -7,6 +7,7 @@ using M183.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -19,15 +20,19 @@ namespace M183.Controllers
     public class LoginController : ControllerBase
     {
         private readonly NewsAppContext _context;
+        private readonly ILogger<LoginController> _logger;
+
         private readonly IConfiguration _configuration;
         private readonly string _appName = "InsecureApp";
         public readonly string _key = "63785462894692873649872364";
 
 
-        public LoginController(NewsAppContext context, IConfiguration configuration)
+        public LoginController(NewsAppContext context, IConfiguration configuration, ILogger<LoginController> logger)
         {
             _context = context;
             _configuration = configuration;
+            _logger = logger;
+
         }
 
         [HttpPost("login-step1")]
@@ -42,6 +47,8 @@ namespace M183.Controllers
                 Detail = "User attempted to log in."
             };
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Login attempt for user {Username}", request.Username);
+
 
 
             if (request == null ||
@@ -51,6 +58,8 @@ namespace M183.Controllers
                 logEntry.Status = "Failed";
                 logEntry.ErrorMessage = "Request was null or missing required fields.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Login failed: Request was null or missing required fields.");
+
                 return BadRequest();
             }
 
@@ -60,6 +69,8 @@ namespace M183.Controllers
                 logEntry.Status = "Failed";
                 logEntry.ErrorMessage = "Invalid username or password.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Login failed: Invalid username or password for user {Username}", request.Username);
+
                 return Unauthorized();
             }
 
@@ -69,6 +80,8 @@ namespace M183.Controllers
             logEntry.Status = "Success";
             logEntry.Detail = "User authenticated successfully. QR code generated for 2FA.";
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Login successful for user {Username}. QR code generated for 2FA.", user.Username);
+
 
             return Ok(new { qrCodeUrl });
         }
@@ -85,6 +98,8 @@ namespace M183.Controllers
                 Detail = "User attempted to validate 2FA token."
             };
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("2FA validation attempt for user {Username}", request.Username);
+
 
             if (request == null ||
                 string.IsNullOrEmpty(request.Username) ||
@@ -94,6 +109,8 @@ namespace M183.Controllers
                 logEntry.Action = "2FA Validation Failed";
                 logEntry.Detail = "Request was null or missing required fields.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("2FA validation failed: Request was null or missing required fields.");
+
                 return BadRequest();
             }
 
@@ -103,6 +120,8 @@ namespace M183.Controllers
                 logEntry.Action = "2FA Validation Failed";
                 logEntry.Detail = "User not found.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("2FA validation failed: User {Username} not found.", request.Username);
+
                 return Unauthorized();
             }
 
@@ -111,6 +130,8 @@ namespace M183.Controllers
                 logEntry.Action = "2FA Validation Failed";
                 logEntry.Detail = "Invalid 2FA token.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("2FA validation failed: Invalid token for user {Username}.", request.Username);
+
                 return Unauthorized("Invalid 2FA token");
             }
 
@@ -120,6 +141,8 @@ namespace M183.Controllers
             logEntry.Action = "2FA Validation Successful";
             logEntry.Detail = "2FA token validated successfully. JWT generated.";
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("2FA validation successful for user {Username}. JWT generated.", request.Username);
+
 
             return Ok(new { token });
         }
@@ -176,6 +199,8 @@ namespace M183.Controllers
                 Detail = "Attempting to retrieve user from database."
             };
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Attempting to authenticate user {Username}", request.Username);
+
 
             string sql = "SELECT * FROM Users WHERE username = @Username AND password = @Password";
 
@@ -197,6 +222,8 @@ namespace M183.Controllers
                                 logEntry.Action = "Database Query Successful";
                                 logEntry.Detail = "User found in database.";
                                 LoggingSystem.Log(logEntry);
+                                _logger.LogInformation("User {Username} authenticated successfully.", request.Username);
+
 
                                 return new User
                                 {
@@ -212,6 +239,8 @@ namespace M183.Controllers
                 logEntry.Action = "Database Query Failed";
                 logEntry.Detail = "User not found or invalid credentials.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Authentication failed for user {Username}.", request.Username);
+
 
                 return null;
             }
@@ -220,6 +249,8 @@ namespace M183.Controllers
                 logEntry.Action = "Database Query Failed";
                 logEntry.Detail = $"Error: {ex.Message}";
                 LoggingSystem.Log(logEntry);
+                _logger.LogError(ex, "Database query failed for user {Username}.", request.Username);
+
                 throw;
             }
         }
@@ -234,6 +265,8 @@ namespace M183.Controllers
                 Detail = "Attempting to generate JWT."
             };
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Generating JWT for user {Username}", user.Username);
+
 
             try
             {
@@ -267,6 +300,8 @@ namespace M183.Controllers
                 logEntry.Action = "JWT Generation Successful";
                 logEntry.Detail = "JWT generated successfully.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogInformation("JWT generated successfully for user {Username}", user.Username);
+
 
                 return jwtToken;
             }
@@ -275,6 +310,8 @@ namespace M183.Controllers
                 logEntry.Action = "JWT Generation Failed";
                 logEntry.Detail = $"Error: {ex.Message}";
                 LoggingSystem.Log(logEntry);
+                _logger.LogError(ex, "JWT generation failed for user {Username}.", user.Username);
+
                 throw;
             }
         }

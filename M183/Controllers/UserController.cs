@@ -13,10 +13,14 @@ namespace M183.Controllers
     public class UserController : ControllerBase
     {
         private readonly NewsAppContext _context;
+        private readonly ILogger<UserController> _logger;
 
-        public UserController(NewsAppContext context)
+
+        public UserController(NewsAppContext context, ILogger<UserController> logger)
         {
             _context = context;
+            _logger = logger;
+
         }
 
         /// <summary>
@@ -42,12 +46,16 @@ namespace M183.Controllers
                 Detail = $"User attempted to update password for UserId: {request.UserId}."
             };
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Password update attempt for user {UserId}", request.UserId);
+
 
             if (request == null)
             {
                 logEntry.Status = "Failed";
                 logEntry.ErrorMessage = "Request was null.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Password update failed: Request was null.");
+
                 return BadRequest();
             }
 
@@ -57,6 +65,8 @@ namespace M183.Controllers
                 logEntry.Status = "Failed";
                 logEntry.ErrorMessage = $"User with UserId: {request.UserId} not found.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Password update failed: User with ID {UserId} not found.", request.UserId);
+
                 return NotFound(string.Format("User {0} not found", request.UserId));
             }
 
@@ -66,6 +76,8 @@ namespace M183.Controllers
                 logEntry.Status = "Failed";
                 logEntry.ErrorMessage = "Old password not confirmed.";
                 LoggingSystem.Log(logEntry);
+                _logger.LogWarning("Password update failed: Old password not confirmed for user {UserId}.", request.UserId);
+
                 return BadRequest(passwordRuleResult.Where(x => x.Item1 == true).Select(x => x.Item2).ToList());
             }
 
@@ -84,6 +96,8 @@ namespace M183.Controllers
             logEntry.Status = "Success";
             logEntry.Detail = $"Password updated successfully for UserId: {request.UserId}.";
             LoggingSystem.Log(logEntry);
+            _logger.LogInformation("Password updated successfully for user {UserId}.", request.UserId);
+
 
             HttpContext.SignOutAsync();
             return Ok("Password changed");

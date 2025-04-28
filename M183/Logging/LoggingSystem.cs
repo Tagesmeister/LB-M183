@@ -23,7 +23,7 @@ namespace M183.Logging
             {
                 model.Id++;
 
-                var logMessage = $"{model.Id} - Time {model.Timestamp} - User: {model.Username} - IsAdmin: {model.IsAdmin} - Action: {model.Action} - Details: {model.Detail}";
+                var logMessage = $"{model.Id}: {model.Timestamp} - User: {model.Username} - Action: {model.Action} - Status: {model.Status} - Details: {model.Detail} - Input: {model.Input} - IP: {model.IPAddress} - Error: {model.ErrorMessage}";
                 File.AppendAllText(LogFilePath, logMessage + Environment.NewLine);
             }
             catch (Exception ex)
@@ -32,6 +32,7 @@ namespace M183.Logging
                 Console.Error.WriteLine($"Failed to write to log file: {ex.Message}");
             }
         }
+
 
     }
 }

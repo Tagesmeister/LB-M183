@@ -11,6 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<NewsAppContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SongContext")));
 
+// Logging konfigurieren
+builder.Host.ConfigureLogging(logging =>
+{
+    logging.ClearProviders();
+    logging.AddConsole();
+});
 
 // JWT-Authentifizierung konfigurieren
 string base64Key = builder.Configuration["Jwt:Key"];
